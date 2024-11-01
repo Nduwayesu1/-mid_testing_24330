@@ -25,4 +25,20 @@ public class RoomDao {
 
         return room; // Return the found Room or null if not found
     }
+
+    public String saveRoom(Room room) {
+        Transaction transaction = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            transaction = session.beginTransaction();
+            session.persist(room);
+            transaction.commit();
+            return "Room saved successfully.";
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+            e.printStackTrace();
+            return "Error saving room: " + e.getMessage();
+        }
+    }
 }
