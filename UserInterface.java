@@ -20,6 +20,7 @@ public class UserInterface {
         MembershipDao membershipDao = new MembershipDao();
         BookDao bookDao = new BookDao();
         ShelfDao shelfDao = new ShelfDao();
+        RoomDao roomDao= new RoomDao();
         Scanner scanner = new Scanner(System.in);
         boolean running = true;
 
@@ -34,6 +35,7 @@ public class UserInterface {
             System.out.println("7. Create Membership");
             System.out.println("8. Create Book");
             System.out.println("9. Create Shelf :");
+            System.out.println("10 .Create Room :");
             System.out.print("Select an option: ");
 
             int choice = scanner.nextInt();
@@ -67,6 +69,13 @@ public class UserInterface {
 
                 case 8:
                     createBook(scanner, bookDao, shelfDao);
+                    break;
+
+                case 9:
+                      createShelf(scanner,shelfDao,roomDao);
+                      break;
+                case 10:
+                    createRoom(scanner,roomDao);
                 default:
                     System.out.println("Invalid choice. Please try again.");
             }
@@ -483,4 +492,23 @@ public class UserInterface {
         }
 
     }
+
+    public static void createRoom(Scanner scanner, RoomDao roomDao) {
+        try {
+            System.out.print("Enter room code: ");
+            String roomCode = scanner.nextLine();
+
+            // Create a new Room instance
+            Room newRoom = new Room();
+            newRoom.setRoomId(UUID.randomUUID()); // Generate a new UUID for the room
+            newRoom.setRoomCode(roomCode);
+
+            // Save the new room using the DAO
+            String result = roomDao.saveRoom(newRoom); // Pass the entire Room object
+            System.out.println(result);
+        } catch (Exception e) {
+            System.out.println("Error during room creation: " + e.getMessage());
+        }
+    }
+
 }
