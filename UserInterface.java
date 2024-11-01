@@ -21,6 +21,7 @@ public class UserInterface {
         BookDao bookDao = new BookDao();
         ShelfDao shelfDao = new ShelfDao();
         RoomDao roomDao= new RoomDao();
+        BorrowerDao  borrowerDao= new BorrowerDao();
         Scanner scanner = new Scanner(System.in);
         boolean running = true;
 
@@ -36,6 +37,7 @@ public class UserInterface {
             System.out.println("8. Create Book");
             System.out.println("9. Create Shelf :");
             System.out.println("10 .Create Room :");
+            System.out.println("11. Borrowing Book :");
             System.out.print("Select an option: ");
 
             int choice = scanner.nextInt();
@@ -76,6 +78,8 @@ public class UserInterface {
                       break;
                 case 10:
                     createRoom(scanner,roomDao);
+                case 11:
+                    initiateBorrowing(scanner,borrowerDao,bookDao,userDao);
                 default:
                     System.out.println("Invalid choice. Please try again.");
             }
@@ -510,5 +514,52 @@ public class UserInterface {
             System.out.println("Error during room creation: " + e.getMessage());
         }
     }
+
+    public static void initiateBorrowing(Scanner scanner, BorrowerDao borrowerDao, BookDao bookDao, UserDao userDao) {
+        try {
+            System.out.print("Enter user ID (reader): ");
+            String userIdInput = scanner.nextLine().trim();
+            UUID userId = UUID.fromString(userIdInput);
+
+            System.out.print("Enter book ID: ");
+            String bookIdInput = scanner.nextLine().trim();
+            UUID bookId = UUID.fromString(bookIdInput);
+
+            // Retrieve the book and user from the database
+            Book book = bookDao.findBookById(bookId);
+            User reader = userDao.personId(userId); // Corrected this method call
+
+            if (book == null) {
+                System.out.println("No book found with the given ID.");
+                return;
+            }
+
+            if (reader == null) {
+                System.out.println("No user found with the given ID.");
+                return;
+            }
+
+            // Get pickup date
+            System.out.print("Enter pickup date (YYYY-MM-DD): ");
+            LocalDate pickupDate = LocalDate.parse(scanner.nextLine());
+
+            // Set return date as per your business logic (e.g., 2 weeks from pickup)
+            LocalDate returnDate = pickupDate.plusWeeks(2); // Example logic
+
+            // Create a new BorrowerId instance
+            BorrowerId borrowerId = new BorrowerId(bookId, userId, pickupDate, returnDate);
+            Borrower newBorrower = new Borrower(borrowerId, book, reader, returnDate, 0); // Adjust the fine logic as needed
+
+            // Save the new Borrower using the DAO
+            String result = borrowerDao.borrowBook(newBorrower);
+            System.out.println(result);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Invalid input: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Error during borrowing process: " + e.getMessage());
+        }
+    }
+
+
 
 }
