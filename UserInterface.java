@@ -527,7 +527,7 @@ public class UserInterface {
 
             // Retrieve the book and user from the database
             Book book = bookDao.findBookById(bookId);
-            User reader = userDao.personId(userId); // Corrected this method call
+            User reader = userDao.personId(userId); // Corrected method call
 
             if (book == null) {
                 System.out.println("No book found with the given ID.");
@@ -536,6 +536,12 @@ public class UserInterface {
 
             if (reader == null) {
                 System.out.println("No user found with the given ID.");
+                return;
+            }
+
+            // Validate if the user can borrow more books
+            if (!userDao.canUserBorrowMoreBooks(userId)) {
+                System.out.println("User cannot borrow more books than allowed by their membership.");
                 return;
             }
 
@@ -559,6 +565,7 @@ public class UserInterface {
             System.out.println("Error during borrowing process: " + e.getMessage());
         }
     }
+
 
 
 
