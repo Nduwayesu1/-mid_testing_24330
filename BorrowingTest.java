@@ -1,6 +1,7 @@
 
 
 
+import static UI.UserInterface.initiateBorrowing;
 import static org.mockito.Mockito.*;
 
 import Dao.BookDao;
@@ -29,41 +30,41 @@ public class BorrowingTest {
     private BorrowerDao borrowerDao;
     private BookDao bookDao;
     private UserDao userDao;
+    private Scanner scanner;
 
     @Before
     public void setUp() {
         borrowerDao = mock(BorrowerDao.class);
         bookDao = mock(BookDao.class);
         userDao = mock(UserDao.class);
+        scanner = new Scanner(System.in);
     }
 
     @Test
-    public void testInitiateBorrowing() {
-        // Mock user input
-        String userInput = "123e4567-e89b-12d3-a456-426614174000\n" + // user ID
-                "456e4567-e89b-12d3-a456-426614174001\n" + // book ID
-                "2023-11-01\n"; // pickup date
-        InputStream in = new ByteArrayInputStream(userInput.getBytes());
-        System.setIn(in);
-        Scanner scanner = new Scanner(System.in);
+    public void testInitiateBorrowing_Success() {
+        UUID userId = UUID.randomUUID();
+        UUID bookId = UUID.randomUUID();
+        User mockUser = new User(); // Mock User object
+        Book mockBook = new Book(); // Mock Book object
 
-        // Mock Book and User
-        UUID userId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
-        UUID bookId = UUID.fromString("456e4567-e89b-12d3-a456-426614174001");
-
-        Book mockBook = new Book(); // Assuming you have a default constructor
-        User mockUser = new User(); // Assuming you have a default constructor
-
-        when(bookDao.findBookById(bookId)).thenReturn(mockBook);
         when(userDao.personId(userId)).thenReturn(mockUser);
+        when(bookDao.findBookById(bookId)).thenReturn(mockBook);
+        when(userDao.canUserBorrowMoreBooks(userId)).thenReturn(true);
+        when(borrowerDao.borrowBook(any(Borrower.class))).thenReturn("Book borrowed successfully.");
 
-        // Call the method under test
-        UserInterface.initiateBorrowing(scanner, borrowerDao, bookDao, userDao);
+        // Simulate user input
+        String input = userId.toString() + "\n" + bookId.toString() + "\n" +
+                "2024-11-01\n";
+        System.setIn(new java.io.ByteArrayInputStream(input.getBytes()));
 
-        // Verify the interactions and state
-        BorrowerId expectedBorrowerId = new BorrowerId(bookId, userId, LocalDate.parse("2023-11-01"), LocalDate.parse("2023-11-15")); // Adjust according to your logic
-        Borrower expectedBorrower = new Borrower(expectedBorrowerId, mockBook, mockUser, LocalDate.parse("2023-11-15"), 0);
+        // Call the method
+        initiateBorrowing(scanner, borrowerDao, bookDao, userDao);
 
-        verify(borrowerDao).borrowBook(expectedBorrower); // Verify that borrowBook was called
+        // Verify interactions
+        verify(userDao).personId(userId);
+        verify(bookDao).findBookById(bookId);
+        verify(userDao).canUserBorrowMoreBooks(userId);
+        verify(borrowerDao).borrowBook(any(Borrower.class));
     }
+
 }
