@@ -10,9 +10,8 @@ import java.util.UUID;
 
 public class Membership_typeDao {
 
-
-    public String saveMembershipType(String membershipName, Integer maxBooks, Integer price) {
-        if (membershipName == null || maxBooks == null || price == null) {
+    public String saveMembershipType(String membershipName, Integer maxBooks, Integer price, Membership membership) {
+        if (membershipName == null || maxBooks == null || price == null || membership == null) {
             return "Invalid input.";
         }
 
@@ -21,12 +20,18 @@ public class Membership_typeDao {
         membershipType.setMembershipName(membershipName);
         membershipType.setMaxBooks(maxBooks);
         membershipType.setPrice(price);
+        membershipType.setMembership(membership);  // Set the association
 
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             Transaction transaction = session.beginTransaction();
             try {
+                // Check if Membership is unsaved (new)
+                if (membership.getMembershipId() == null) {
+                    session.save(membership);  // Save Membership first if it is unsaved
+                }
+
+                // Now save Membership_type with the saved Membership entity
                 session.save(membershipType);
-                session.flush(); // Ensure changes are sent to the database
                 transaction.commit();
                 return "Membership type created successfully";
             } catch (Exception e) {
@@ -39,6 +44,7 @@ public class Membership_typeDao {
     }
 
 
+
     public Membership findMembershipById(UUID membershipId) {
         Membership membership = null;
 
@@ -49,6 +55,8 @@ public class Membership_typeDao {
             // Optionally log if the membership is not found
             if (membership == null) {
                 System.out.println("No membership found with ID: " + membershipId);
+            }else{
+                return membership;
             }
         } catch (Exception ex) {
             // Log the exception for further analysis
@@ -56,7 +64,8 @@ public class Membership_typeDao {
             ex.printStackTrace(); // Optional: Log the stack trace if needed
         }
 
-        return membership; // Return the found membership or null if not found
+        // Return the found membership or null if not found
+        return null;
     }
 
 }
