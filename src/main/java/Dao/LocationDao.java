@@ -3,6 +3,7 @@ package Dao;
 import model1.Enum.ELocation_type;
 import model1.HibernateUtil;
 import model1.Location;
+import model1.User;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -22,7 +23,6 @@ public class LocationDao {
             Transaction tr=session.beginTransaction();
             session.persist(location);
             tr.commit();
-            session.close();
             return "Data Saved Succesful";
         }catch(Exception ex){
             ex.printStackTrace();;
@@ -64,6 +64,33 @@ public class LocationDao {
             e.printStackTrace();
         }
         return location;
+    }
+
+
+
+    public String getUserProvinceName(UUID userId) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            User user = session.get(User.class, userId);
+
+            if (user != null) {
+                Location location = user.getLocation();
+
+                // Traverse up to find the location of type PROVINCE
+                while (location != null && location.getType() != ELocation_type.PROVINCE) {
+                    location = location.getParentLocation(); // Assuming getParentLocation() provides the parent
+                }
+
+                // If we find a location of type PROVINCE, return its name
+                if (location != null && location.getType() == ELocation_type.PROVINCE) {
+                    return location.getLocationName();
+                }
+            }
+
+            return "Province not found for user or user not found.";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "An error occurred while retrieving the province name.";
+        }
     }
 
 }
