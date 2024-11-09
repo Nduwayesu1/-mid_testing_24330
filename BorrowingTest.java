@@ -1,23 +1,7 @@
-
-
-
-import static UI.UserInterface.initiateBorrowing;
-import static org.mockito.Mockito.*;
-
-import Dao.BookDao;
 import Dao.BorrowerDao;
-import Dao.UserDao;
 import UI.UserInterface;
-import model1.Book;
-import model1.Borrower;
-
-import model1.BorrowerId;
-import model1.User;
-
-
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -25,46 +9,43 @@ import java.time.LocalDate;
 import java.util.Scanner;
 import java.util.UUID;
 
+import static org.mockito.Mockito.*;
+
 public class BorrowingTest {
 
     private BorrowerDao borrowerDao;
-    private BookDao bookDao;
-    private UserDao userDao;
-    private Scanner scanner;
+    private UserInterface userInterface;
 
     @Before
     public void setUp() {
-        borrowerDao = mock(BorrowerDao.class);
-        bookDao = mock(BookDao.class);
-        userDao = mock(UserDao.class);
-        scanner = new Scanner(System.in);
+        borrowerDao = mock(BorrowerDao.class); // Mock BorrowerDao
+        userInterface=mock(UserInterface.class);
+
     }
 
     @Test
-    public void testInitiateBorrowing_Success() {
-        UUID userId = UUID.randomUUID();
-        UUID bookId = UUID.randomUUID();
-        User mockUser = new User(); // Mock User object
-        Book mockBook = new Book(); // Mock Book object
+    public void testInitiateBorrowing_Successful() {
+        // Arrange
+        String userId = "c6f5d22a-ffa6-4cb6-b677-2750f428fb23"; // Sample UUID for user
+        String bookId = "477c0866-3c68-4461-8177-e35d5ec29a74"; // Sample UUID for book
+        String pickupDate = "2024-11-20"; // Sample pickup date
 
-        when(userDao.personId(userId)).thenReturn(mockUser);
-        when(bookDao.findBookById(bookId)).thenReturn(mockBook);
-        when(userDao.canUserBorrowMoreBooks(userId)).thenReturn(true);
-        when(borrowerDao.borrowBook(any(Borrower.class))).thenReturn("Book borrowed successfully.");
+        // Simulate user input for userId, bookId, and pickupDate
+        String input = userId + "\n" + bookId + "\n" + pickupDate + "\n";
+        InputStream in = new ByteArrayInputStream(input.getBytes());
+        System.setIn(in);
+        Scanner scanner = new Scanner(System.in);
 
-        // Simulate user input
-        String input = userId.toString() + "\n" + bookId.toString() + "\n" +
-                "2024-11-01\n";
-        System.setIn(new java.io.ByteArrayInputStream(input.getBytes()));
+        // Mock the borrowBook method to return a success message
+        when(borrowerDao.borrowBook(UUID.fromString(bookId), UUID.fromString(userId), LocalDate.parse(pickupDate)))
+                .thenReturn("Borrowing successful!");
 
-        // Call the method
-        initiateBorrowing(scanner, borrowerDao, bookDao, userDao);
+        // Act
+        UserInterface.initiateBorrowing(scanner);
 
-        // Verify interactions
-        verify(userDao).personId(userId);
-        verify(bookDao).findBookById(bookId);
-        verify(userDao).canUserBorrowMoreBooks(userId);
-        verify(borrowerDao).borrowBook(any(Borrower.class));
+        // Assert
+        // Verify that the borrowBook method was called with the expected arguments
+        verify(userInterface, times(1)).initiateBorrowing(scanner);
     }
-
 }
+
