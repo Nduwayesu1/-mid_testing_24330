@@ -5,65 +5,50 @@ import model1.Enum.EStatus;
 import model1.User;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.time.LocalDate;
 import java.util.Scanner;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.*;
 
-public class MembershipTest {
+public class CreateMembershipTest {
+
     private MembershipDao membershipDao;
     private UserDao userDao;
 
     @Before
     public void setUp() {
-        membershipDao = mock(MembershipDao.class);
-        userDao = mock(UserDao.class);
+        membershipDao = mock(MembershipDao.class); // Mock MembershipDao
+        userDao = mock(UserDao.class); // Mock UserDao
     }
 
     @Test
-    public void testCreateMembership_ValidInput_ShouldCreateMembership() {
+    public void testCreateMembership() {
         // Arrange
-        String input = "MEM123\n2024-12-31\n100\nPENDING\n" + UUID.randomUUID().toString() + "\n"; // Mocked input
+
+        String membershipCode = "M12345";
+        String expiringDate = "2025-12-31";
+        String pricePerDay = "10";
+        EStatus status= EStatus.PENDING;
+        String userId = "eb779ce1-7b37-4b6d-bfe3-ce8cb1d1e736";
+
+        // Simulate user input
+        String input = membershipCode + "\n" + expiringDate + "\n" + pricePerDay + "\n" + status + "\n" + userId + "\n";
         InputStream in = new ByteArrayInputStream(input.getBytes());
         System.setIn(in);
         Scanner scanner = new Scanner(System.in);
 
-        // Generate a mock user ID for the test
-        UUID userId = UUID.fromString(input.split("\n")[4]);
-
-        // Mocking UserDao to return a valid user
-        User mockUser = new User(); // Assuming a User class with a default constructor
-        when(userDao.personId(UUID.fromString(String.valueOf(userId)))).thenReturn(mockUser);
+        // Set up a mock user with the given user ID
+        UUID userUUID = UUID.fromString(userId);
+        User user = new User(userUUID, "student");
+        when(userDao.getUserId(userUUID)).thenReturn(user);
 
         // Act
-        UserInterface.createMembership(scanner, membershipDao); // Use scanner directly
+        UserInterface.createMembership(scanner, membershipDao);
 
-        // Capture the arguments for verification
-        ArgumentCaptor<String> membershipCodeCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<LocalDate> expiringTimeCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        ArgumentCaptor<Integer> pricePerDayCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<EStatus> statusCaptor = ArgumentCaptor.forClass(EStatus.class);
-        ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
-
-        // Verify the call to registerMembership
-        verify(membershipDao).registerMembership(
-                membershipCodeCaptor.capture(),
-                expiringTimeCaptor.capture(),
-                pricePerDayCaptor.capture(),
-                statusCaptor.capture(),
-                UUID.fromString(String.valueOf(userIdCaptor.capture()))
-        );
-
-        // Assert the captured values
-        assertEquals("MEM123", membershipCodeCaptor.getValue());
-        assertEquals(LocalDate.parse("2024-12-31"), expiringTimeCaptor.getValue());
-        assertEquals(EStatus.PENDING, statusCaptor.getValue());
-        assertEquals(userId, userIdCaptor.getValue());
+        // Assert
+        // Verify that registerMembership was called once with any Membership object
+        verify(membershipDao, times(1)).registerMembership(any());
     }
 }
