@@ -4,11 +4,13 @@ import Dao.*;
 import model1.*;
 import model1.Enum.EBook_status;
 import model1.Enum.ELocation_type;
-import model1.Enum.ERole; // Assuming you have an ERole enum
+import model1.Enum.ERole;
 import model1.Enum.EStatus;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Scanner;
 import java.util.UUID;
 
@@ -21,8 +23,9 @@ public class UserInterface {
         BookDao bookDao = new BookDao();
         ShelfDao shelfDao = new ShelfDao();
         RoomDao roomDao= new RoomDao();
-        BorrowerDao  borrowerDao= new BorrowerDao();
+        BorrowerDao  borrowerDa= new BorrowerDao();
         Scanner scanner = new Scanner(System.in);
+
         boolean running = true;
 
         while (running) {
@@ -38,10 +41,15 @@ public class UserInterface {
             System.out.println("9. Create Shelf :");
             System.out.println("10 .Create Room :");
             System.out.println("11. Borrowing Book :");
+            System.out.println("12. Check Number of Books :");
+            System.out.println("13. Find Room with Fewest Books :");
+            System.out.println("14.Find Province By person ID :");
+            System.out.println("15. Return Book : ");
+            System.out.println("16.Number Of Books in Room :");
+            System.out.println("17.Get province By Id: ");
             System.out.print("Select an option: ");
-
             int choice = scanner.nextInt();
-            scanner.nextLine(); // Consume the newline character
+            scanner.nextLine();
 
             switch (choice) {
                 case 1:
@@ -78,8 +86,34 @@ public class UserInterface {
                       break;
                 case 10:
                     createRoom(scanner,roomDao);
+                    break;
                 case 11:
-                    initiateBorrowing(scanner,borrowerDao,bookDao,userDao);
+                    initiateBorrowing(scanner);
+                    break;
+                case 12:
+                    checkNumberOfBooks(bookDao);
+                    break;
+                case 13:
+                    String room = roomDao.getRoomWithFewestBooks();
+                    if (room != null) {
+                        System.out.println("Room with the fewest books:");
+                        System.out.println(room);
+                    } else {
+                        System.out.println("No room found or an error occurred.");
+                    }
+                    break;
+                case 14:
+                    displayProvinceByPersonId();
+                    break;
+                case 15:
+                    promptAndProcessLateFee();
+                    break;
+                case 16:
+                    numberOfBooks_inRoom();
+                    break;
+                case 17:
+                    getUserProvinceNameFromInput();
+                    break;
                 default:
                     System.out.println("Invalid choice. Please try again.");
             }
@@ -124,7 +158,7 @@ public class UserInterface {
                 String parentLocationCode = scanner.nextLine();
 
                 if (!parentLocationCode.isEmpty()) {
-                    parentLocation = locationDao.findByLocationCode(parentLocationCode); // Implement this method in LocationDao
+                    parentLocation = locationDao.findByLocationCode(parentLocationCode);
                     if (parentLocation == null) {
                         System.out.println("Parent location not found. Please ensure it exists.");
                         return;
@@ -176,12 +210,12 @@ public class UserInterface {
             String userName = scanner.nextLine();
 
             System.out.print("Enter Person ID: ");
-            String personId = scanner.nextLine(); // Consider using this if needed in Person
+            String personId = scanner.nextLine();
 
             System.out.print("Enter Password: ");
             String password = scanner.nextLine();
 
-            System.out.print("Enter PhoneNumber: ");
+            System.out.print("Enter Phone Number: ");
             String phoneNumber = scanner.nextLine();
 
             System.out.println("Select User Role:");
@@ -214,8 +248,11 @@ public class UserInterface {
                 return;
             }
 
+            // Hash the password before creating the User
+            String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+
             // Create the User with all required fields
-            User user = new User(personId, firstName, lastName, userName, password, phoneNumber, userRole, location);
+            User user = new User(personId, firstName, lastName, userName, phoneNumber, hashedPassword, userRole, location);
 
             String savedUser = userDao.saveUser(user);
             System.out.println(savedUser);
@@ -239,41 +276,45 @@ public class UserInterface {
         }
     }
 
+
     public static void userLogin(Scanner scanner, UserDao userDao) {
         try {
-            System.out.print("Enter username: ");
-            String username = scanner.nextLine();
+            System.out.print("Enter user ID: ");
+            String userIdInput = scanner.nextLine();
 
-            // Validate that the username is not empty
-            if (username.isEmpty()) {
-                System.out.println("Username cannot be empty.");
-                return; // Exit if the username is invalid
+            // Validate that the user ID is not empty
+            if (userIdInput.isEmpty()) {
+                System.out.println("User ID cannot be empty.");
+                return;
             }
 
-            System.out.print("Enter password: ");
-            String password = scanner.nextLine();
+            // Validate that the user ID can be parsed into a UUID
+            UUID userId;
+            try {
+                // Parse the input into a UUID
+                userId = UUID.fromString(userIdInput);
+            } catch (IllegalArgumentException e) {
+                System.out.println("Invalid User ID format. Please enter a valid UUID.");
+                return;
+            }
+
+            // Prompt for the password
+            System.out.print("Enter Username: ");
+            String username = scanner.nextLine(); // Get the password input
 
             // Validate that the password is not empty
-            if (password.isEmpty()) {
+            if (username.isEmpty()) {
                 System.out.println("Password cannot be empty.");
                 return; // Exit if the password is invalid
             }
 
-            // Call the authenticate method in UserDao
-            User authenticatedUser = userDao.authenticateUser(username, password);
+            // Authenticate the user with the plaintext password
+            String authResult = userDao.authenticateUser(userId, username);
+            System.out.println(authResult); // Print the result of authentication
 
-            // Check if the user was authenticated
-            if (authenticatedUser != null) {
-                System.out.println("Login successful! Welcome, " + authenticatedUser.getFirstName() + "!");
-            } else {
-                System.out.println("Invalid username or password.");
-            }
         } catch (Exception e) {
             System.out.println("Error during login: " + e.getMessage());
-            // Optionally log the error for further analysis
         }
-
-
     }
 
 
@@ -315,10 +356,9 @@ public class UserInterface {
             Membership_typeDao membershipTypeDao = new Membership_typeDao();
 
             // Save the new membership type
-            membershipTypeDao.saveMembershipType(membershipName, maxBooks, price); // Pass the newMembershipType object
+          String result= membershipTypeDao.saveMembershipType(membershipName, maxBooks, price,membership); // Pass the newMembershipType object
+          System.out.println(result);
 
-            // Confirm the membership type was created
-            System.out.println("Membership type created successfully: " + newMembershipType.getMembershipName());
         } catch (Exception e) {
             System.out.println("Error during membership type creation: " + e.getMessage());
             // Optionally log the error for further analysis
@@ -337,38 +377,23 @@ public class UserInterface {
             int pricePerDay = Integer.parseInt(scanner.nextLine());
 
             // Additional user input for status
-            System.out.print("Enter status (e.g., ACTIVE, INACTIVE): ");
-            EStatus status = EStatus.valueOf(scanner.nextLine().toUpperCase());
+            System.out.print("Enter Membership status ");
+            EStatus status = EStatus.valueOf(scanner.nextLine());
 
-            System.out.print("Enter person ID for association: ");
-            String userIdInput = scanner.nextLine().trim(); // Input from user
+//            System.out.print("Enter person ID for association: ");
+//            UUID userIdInput = UUID.fromString(scanner.nextLine().trim()); // Input from user
 
-            // Remove the 0x prefix if present
-            if (userIdInput.startsWith("0x")) {
-                userIdInput = userIdInput.substring(2);
-            }
 
-            // Clean up the string: keep only valid hex characters
-            userIdInput = userIdInput.replaceAll("[^0-9A-Fa-f]", "").trim();
 
-            // Check if the cleaned input is valid (32 hex digits)
-            if (userIdInput.length() != 32) {
-                System.out.println("Invalid UUID format. Please enter a valid UUID string (32 hex digits).");
-                return;
-            }
+            System.out.print("Enter User ID: ");
+            UUID userId = UUID.fromString(scanner.nextLine().trim()); // Input from user
 
             // Create the UUID from the cleaned string with hyphens
-            UUID userId = UUID.fromString(
-                    userIdInput.substring(0, 8) + "-" +
-                            userIdInput.substring(8, 12) + "-" +
-                            userIdInput.substring(12, 16) + "-" +
-                            userIdInput.substring(16, 20) + "-" +
-                            userIdInput.substring(20)
-            );
+
 
             // Retrieve the user from the database (assuming a UserDao is available)
             UserDao userDao = new UserDao();
-            User user = userDao.personId(userId);
+            User user = userDao.getUserId(userId);
 
             if (user == null) {
                 System.out.println("No user found with the given ID.");
@@ -400,6 +425,7 @@ public class UserInterface {
 
     public static void createBook(Scanner scanner, BookDao bookDao, ShelfDao shelfDao) {
         try {
+
             System.out.print("Enter book title: ");
             String title = scanner.nextLine();
 
@@ -415,7 +441,7 @@ public class UserInterface {
             System.out.print("Enter publisher name: ");
             String publisherName = scanner.nextLine();
 
-            System.out.print("Enter status (e.g., AVAILABLE, CHECKED_OUT): ");
+            System.out.print("Enter Book status  ");
             EBook_status status = EBook_status.valueOf(scanner.nextLine().toUpperCase());
 
             System.out.print("Enter shelf ID: ");
@@ -504,7 +530,7 @@ public class UserInterface {
 
             // Create a new Room instance
             Room newRoom = new Room();
-            newRoom.setRoomId(UUID.randomUUID()); // Generate a new UUID for the room
+//            newRoom.setRoomId(UUID.randomUUID()); // Generate a new UUID for the room
             newRoom.setRoomCode(roomCode);
 
             // Save the new room using the DAO
@@ -515,50 +541,35 @@ public class UserInterface {
         }
     }
 
-    public static void initiateBorrowing(Scanner scanner, BorrowerDao borrowerDao, BookDao bookDao, UserDao userDao) {
+
+
+    public static void initiateBorrowing(Scanner scanner) {
         try {
+            // Get the user ID (reader)
             System.out.print("Enter user ID (reader): ");
             String userIdInput = scanner.nextLine().trim();
             UUID userId = UUID.fromString(userIdInput);
 
+            // Get the book ID
             System.out.print("Enter book ID: ");
             String bookIdInput = scanner.nextLine().trim();
             UUID bookId = UUID.fromString(bookIdInput);
 
-            // Retrieve the book and user from the database
-            Book book = bookDao.findBookById(bookId);
-            User reader = userDao.personId(userId); // Corrected method call
-
-            if (book == null) {
-                System.out.println("No book found with the given ID.");
-                return;
-            }
-
-            if (reader == null) {
-                System.out.println("No user found with the given ID.");
-                return;
-            }
-
-            // Validate if the user can borrow more books
-            if (!userDao.canUserBorrowMoreBooks(userId)) {
-                System.out.println("User cannot borrow more books than allowed by their membership.");
-                return;
-            }
-
-            // Get pickup date
+            // Get the pickup date
             System.out.print("Enter pickup date (YYYY-MM-DD): ");
-            LocalDate pickupDate = LocalDate.parse(scanner.nextLine());
+            LocalDate pickupDate;
+            try {
+                pickupDate = LocalDate.parse(scanner.nextLine().trim());
+            } catch (DateTimeParseException e) {
+                System.out.println("Invalid date format. Please use YYYY-MM-DD.");
+                return;
+            }
 
-            // Set return date as per your business logic (e.g., 2 weeks from pickup)
-            LocalDate returnDate = pickupDate.plusWeeks(2); // Example logic
-
-            // Create a new BorrowerId instance
-            BorrowerId borrowerId = new BorrowerId(bookId, userId, pickupDate, returnDate);
-            Borrower newBorrower = new Borrower(borrowerId, book, reader, returnDate, 0); // Adjust the fine logic as needed
-
-            // Save the new Borrower using the DAO
-            String result = borrowerDao.borrowBook(newBorrower);
+            // Call the borrowing method in BorrowerDao
+            BorrowerDao borrowerDao =new BorrowerDao();
+            String result = borrowerDao.borrowBook(bookId, userId, pickupDate);
             System.out.println(result);
+
         } catch (IllegalArgumentException e) {
             System.out.println("Invalid input: " + e.getMessage());
         } catch (Exception e) {
@@ -566,7 +577,106 @@ public class UserInterface {
         }
     }
 
+    public static void checkNumberOfBooks(BookDao bookDao) {
+        try {
+            int totalBooks = bookDao.getTotalNumberOfBooks();
+            System.out.println("Total number of books in the system: " + totalBooks);
+        } catch (Exception e) {
+            System.out.println("Error retrieving book count: " + e.getMessage());
+        }
+    }
+
+    public static void numberOfBooks_inRoom() {
+        Scanner scanner = new Scanner(System.in);
+
+        // Prompt user for Room ID input
+        System.out.print("Please enter the Room ID (UUID format): ");
+        String roomIdInput = scanner.nextLine();
+
+        try {
+            // Parse the user input into a UUID
+            UUID roomId = UUID.fromString(roomIdInput);
+
+            // Call the method to get the number of books
+            RoomDao  room= new RoomDao();
+            long bookCount = room.findNumberOfBooksInRoom(roomId);
+
+            // Display the result
+            System.out.println("Total number of books in the room: " + bookCount);
+
+        } catch (IllegalArgumentException e) {
+            // Handle invalid UUID input
+            System.out.println("Invalid Room ID format. Please provide a valid UUID.");
+        }
+    }
+
+    public static void displayProvinceByPersonId() {
+        UserDao userDao = new UserDao();
+        Scanner scanner = new Scanner(System.in);
+
+        // Prompt the user for person ID input
+        System.out.print("Enter your Person ID: ");
+        String personId = scanner.nextLine();
+
+        // Get the province name based on the person ID
+        String provinceName = userDao.getProvinceByPersonId(personId);
+
+        // Display the province name or error message
+        if (provinceName != null) {
+            System.out.println("Province Name: " + provinceName);
+        } else {
+            System.out.println("No province found for the given Person ID.");
+        }
+    }
 
 
+
+    public static void promptAndProcessLateFee() {
+        FeeService feeService=new FeeService();
+        Scanner scanner = new Scanner(System.in);
+        try {
+            System.out.print("Enter User ID (UUID format): ");
+            UUID userId = UUID.fromString(scanner.nextLine());
+
+            System.out.print("Enter Book ID (UUID format): ");
+            UUID bookId = UUID.fromString(scanner.nextLine());
+
+            System.out.print("Enter Return Date (yyyy-MM-dd): ");
+            LocalDate returnDate = LocalDate.parse(scanner.nextLine(), DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            System.out.print("Enter Daily Late Fee: ");
+            double dailyLateFee = Double.parseDouble(scanner.nextLine());
+
+           String result= feeService.calculateAndUpdateLateFee(userId, bookId, returnDate, dailyLateFee);
+
+            System.out.println(result);
+
+        } catch (Exception e) {
+            System.out.println("Invalid input. Please try again.");
+            e.printStackTrace();
+        } finally {
+            scanner.close();
+        }
+    }
+
+
+    public static void getUserProvinceNameFromInput() {
+        Scanner scanner = new Scanner(System.in);
+
+        try {
+            System.out.print("Enter User ID: ");
+            String userIdInput = scanner.nextLine();  // Take input from user
+            UUID userId = UUID.fromString(userIdInput);  // Convert input to UUID
+
+            // Call getUserProvinceName and print result
+            LocationDao  locationDao=new LocationDao();
+            String provinceName = locationDao.getUserProvinceName(userId);
+            System.out.println("Province: " + provinceName);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Invalid UUID format. Please enter a valid User ID.");
+        } finally {
+            scanner.close();  // Close the scanner
+        }
+    }
 
 }
