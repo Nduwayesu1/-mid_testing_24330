@@ -1,71 +1,79 @@
 package Dao;
 
+import model1.Enum.EStatus;
 import model1.HibernateUtil;
 import model1.Membership;
 import model1.Membership_type;
+import model1.User;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
-public class Membership_typeDao {
+public class MembershipDao {
 
-    public String saveMembershipType(String membershipName, Integer maxBooks, Integer price, Membership membership) {
-        if (membershipName == null || maxBooks == null || price == null || membership == null) {
-            return "Invalid input.";
+
+    public void registerMembership(Membership membership) {
+        // Ensure that required fields are set before saving
+        if (membership.getMembershipCode() == null || membership.getMembershipCode().isEmpty()) {
+            throw new IllegalArgumentException("Membership code cannot be null or empty.");
         }
 
-        Membership_type membershipType = new Membership_type();
-        membershipType.setMembershipTypeId(UUID.randomUUID());
-        membershipType.setMembershipName(membershipName);
-        membershipType.setMaxBooks(maxBooks);
-        membershipType.setPrice(price);
-        membershipType.setMembership(membership);  // Set the association
+        // Fetch the user based on the user's ID stored in the membership
+        User user = membership.getUser(); // Assuming user is already set in Membership
 
+        if (user == null) {
+            throw new IllegalArgumentException("User cannot be null.");
+        }
+
+        // Save the new membership to the database
+        Transaction transaction = null;
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            Transaction transaction = session.beginTransaction();
-            try {
-                // Check if Membership is unsaved (new)
-                if (membership.getMembershipId() == null) {
-                    session.save(membership);  // Save Membership first if it is unsaved
-                }
-
-                // Now save Membership_type with the saved Membership entity
-                session.save(membershipType);
-                transaction.commit();
-                return "Membership type created successfully";
-            } catch (Exception e) {
-                transaction.rollback(); // Rollback if there's an error
-                return "Error during saving membership type: " + e.getMessage();
+            transaction = session.beginTransaction();
+            session.save(membership); // Save the membership
+            transaction.commit();
+        } catch (Exception ex) {
+            if (transaction != null) {
+                transaction.rollback(); // Rollback in case of an error
             }
-        } catch (Exception e) {
-            return "Error during session management: " + e.getMessage();
+            ex.printStackTrace();
+            throw new RuntimeException("Failed to register membership: " + ex.getMessage());
+        }
+    }
+    public void registerMembership(String membershipCode, LocalDate expiringTime, Integer pricePerDay, EStatus status, UUID userId) {
+        // Create a new Membership instance
+        Membership newMembership = new Membership(
+                UUID.randomUUID(), // Generate a new UUID for membershipId
+                membershipCode,
+                expiringTime,
+                pricePerDay,
+                null, // Initially no membership types
+                status,
+                findUserById(userId), // Retrieve the User using userId
+                LocalDate.now() // Set the registration date as today
+        );
+
+        // Save the new membership to the database
+        Transaction transaction = null;
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            transaction = session.beginTransaction();
+            session.save(newMembership); // Save the Membership object
+            transaction.commit(); // Commit the transaction
+        } catch (Exception ex) {
+            if (transaction != null) {
+                transaction.rollback(); // Rollback in case of an error
+            }
+            ex.printStackTrace(); // Log the exception
         }
     }
 
-
-
-    public Membership findMembershipById(UUID membershipId) {
-        Membership membership = null;
-
+    private User findUserById(UUID userId) {
+        // Logic to retrieve user from the database using userId
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            // Fetch the membership using the provided ID
-            membership = session.get(Membership.class, membershipId);
-
-            // Optionally log if the membership is not found
-            if (membership == null) {
-                System.out.println("No membership found with ID: " + membershipId);
-            }else{
-                return membership;
-            }
-        } catch (Exception ex) {
-            // Log the exception for further analysis
-            System.err.println("Error fetching membership by ID: " + ex.getMessage());
-            ex.printStackTrace(); // Optional: Log the stack trace if needed
+            return session.get(User.class, userId); // Fetch user by UUID
         }
-
-        // Return the found membership or null if not found
-        return null;
     }
 
 }
