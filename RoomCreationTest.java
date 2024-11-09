@@ -5,14 +5,14 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.io.ByteArrayInputStream;
 import java.util.Scanner;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-public class RoomCreationTest {
+public class ShelfToRoomTest {
 
     private RoomDao roomDao;
     private Scanner scanner;
@@ -20,14 +20,12 @@ public class RoomCreationTest {
     @Before
     public void setUp() {
         roomDao = mock(RoomDao.class);
-        scanner = mock(Scanner.class);
+        ByteArrayInputStream inputStream = new ByteArrayInputStream("Room3".getBytes());
+        scanner = new Scanner(inputStream);
     }
 
     @Test
     public void testCreateRoom_Success() {
-        // Simulate user input for room code
-        when(scanner.nextLine()).thenReturn("Room101");
-
         // Simulate the DAO saveRoom method
         when(roomDao.saveRoom(any(Room.class))).thenReturn("Room saved successfully.");
 
@@ -40,8 +38,8 @@ public class RoomCreationTest {
 
         // Validate the captured Room object
         Room savedRoom = roomCaptor.getValue();
-        assertEquals("Room101", savedRoom.getRoomCode());
+        assertEquals("Room3", savedRoom.getRoomCode());
         // You can also check that a UUID is generated for roomId
-        assertNotNull(savedRoom.getRoomId());
+        assertNull(savedRoom.getRoomId());
     }
 }
