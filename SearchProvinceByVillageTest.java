@@ -12,7 +12,7 @@ import java.util.Scanner;
 import static org.mockito.Mockito.*;
 import static org.junit.Assert.*;
 
-public class SearchLocationTest {
+public class SearchProvinceByVillageTest {
 
     private LocationDao locationDao;
     private final PrintStream originalOut = System.out; // Store original System.out
@@ -28,7 +28,7 @@ public class SearchLocationTest {
     public void testSearchByVillage_Found() {
         // Arrange
         // Specify the name of the village
-        String villageName = "ghjk"; // Manual input for the village name
+        String villageName = "Kinyinya"; // Manual input for the village name
         String input = villageName + "\n"; // Format as if it were console input
         InputStream in = new ByteArrayInputStream(input.getBytes());
         System.setIn(in);
@@ -44,7 +44,7 @@ public class SearchLocationTest {
         // Verify that searchByVillages was called with the correct village name
         verify(locationDao, times(1)).searchByVillages(villageName);
         // Check the output
-        assertTrue(outputStreamCaptor.toString().contains("The province for the village 'ghjk' is: KIGALI"));
+        assertTrue(outputStreamCaptor.toString().contains("The province for the village 'Kinyinya' is: KIGALI"));
     }
 
 
