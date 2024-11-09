@@ -1,10 +1,7 @@
 package Dao;
 
 import jakarta.persistence.*;
-import model1.HibernateUtil;
-import model1.Location;
-import model1.Person;
-import model1.User;
+import model1.*;
 import org.hibernate.Hibernate;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -34,7 +31,6 @@ public class UserDao {
             Transaction  tr= session.beginTransaction();
             session.save(user);
             tr.commit();
-            session.close();
             return  "user Created Succesfull";
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -84,51 +80,121 @@ public class UserDao {
         return locationName; // Return the location name or null if not found
     }
 
-    public User authenticateUser(String username, String password) {
-        User user = null;
-
+    public String authenticateUser(UUID userId, String username) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             Transaction transaction = session.beginTransaction();
 
-            // HQL to fetch the user by username
-            String hql = "FROM User u WHERE u.userName = :username";
-            user = session.createQuery(hql, User.class)
-                    .setParameter("username", username)
-                    .uniqueResult();
+            // Modify the query to only retrieve the password field
+            String hql = "SELECT u.userName FROM User u WHERE u.userId = :userId";
+            org.hibernate.query.Query<String> query = session.createQuery(hql, String.class);
+            query.setParameter("userId", userId);
 
-            transaction.commit(); // Commit the transaction
+            // Retrieve the password field only
+            List<String> results = query.getResultList();
+            transaction.commit();
 
-            // Check if the user was found and validate the password
-            if (user != null && BCrypt.checkpw(password, user.getPassword())) {
-                return user; // Return the authenticated user
+            if (!results.isEmpty()) {
+                String retrievedUsername = results.get(0); // Get the hashed password
+
+                // Validate the password against the hashed password using BCrypt
+                if (retrievedUsername.equals(username)) {
+                    return "Success"; // Authentication successful
+                } else {
+                    return "Failed"; // Password mismatch
+                }
             } else {
-                return null; // Return null if authentication fails
+                return "Not Found"; // No user found
             }
         } catch (Exception ex) {
             ex.printStackTrace(); // Handle exceptions appropriately
-            return null; // Return null in case of an error
+            return "Internal server Error"; // Handle exceptions gracefully
         }
     }
 
-    public User personId(UUID person_id) {
-        User user = null;
+
+
+
+
+    public boolean canUserBorrowMoreBooks(UUID userId) {
+        // Define the maximum number of books a user can borrow
+        int maxBooksAllowed = 5;
+
+        // Initialize the number of books borrowed by the user
+        int borrowedCount = 0;
+
+        Transaction transaction = null;
+
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            // Start a transaction
+            transaction = session.beginTransaction();
+
+            // Query to count the number of books borrowed by the user
+            Query query = (Query) session.createQuery("SELECT COUNT(b) FROM Borrower b WHERE b.reader_id = :userId", Borrower.class);
+            query.setParameter("userId", userId);
+            borrowedCount = query.getMaxResults(); // Get the count of borrowed books
+
+            // Commit the transaction
+            transaction.commit();
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback(); // Rollback if there was an error
+            }
+            e.printStackTrace(); // Handle the exception (logging, etc.)
+        }
+
+        // Check if the user can borrow more books
+        return borrowedCount < maxBooksAllowed;
+    }
+
+    public User getUserId(UUID userId) {
+        User user = null; // Initialize user to null
 
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             // Begin a transaction
             Transaction transaction = session.beginTransaction();
 
-            // Fetch the user using the provided ID
-            user = session.get(User.class, person_id);
+            // Fetch the user using the provided userId
+            user = session.get(User.class, userId);
 
             // Commit the transaction
             transaction.commit();
+
+            if (user == null) {
+                System.out.println("No user found with the provided user ID: " + userId);
+            }
         } catch (Exception ex) {
             ex.printStackTrace(); // Handle exceptions appropriately
         }
 
-        return user; // Return the found user or null if not found
+        return user; // Return the user or null if not found
     }
 
 
+    // Method to get the province name based on person ID
+    public String getProvinceByPersonId(String personId) {
+        Transaction transaction = null;
+        String provinceName = null;
+
+        // Try-with-resources block to ensure session is closed properly
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            transaction = session.beginTransaction();
+
+            // Query to find the user's location
+            String hql = "SELECT u.location.parentLocation.locationName FROM User u WHERE u.personId = :personId";
+            Query query = (Query) session.createQuery(hql, String.class);
+            query.setParameter("personId", personId);
+
+            provinceName = query.toString();
+
+            transaction.commit();
+        } catch (Exception e) {
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
+            }
+            e.printStackTrace();
+        }
+
+        return provinceName;
+    }
 
 }
