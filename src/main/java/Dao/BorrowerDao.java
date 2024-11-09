@@ -1,164 +1,96 @@
 package Dao;
 
-import jakarta.persistence.*;
-import model1.HibernateUtil;
-import model1.Location;
-import model1.Person;
-import model1.User;
-import org.hibernate.Hibernate;
+import model1.*;
+import model1.Enum.EBook_status;
+import model1.Enum.EStatus;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
-import org.springframework.security.crypto.bcrypt.BCrypt;
 
-import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
-import static model1.HibernateUtil.sessionFactory;
+public class BorrowerDao {
 
-public class UserDao {
-
-    private UserDao userDao;
-
-    private SessionFactory sessionFactory;
-
-    public UserDao() {
-        this.sessionFactory = HibernateUtil.getSessionFactory();
-    }
-
-    public String saveUser(User user) {
-
-        try {
-
-            Session session= HibernateUtil.getSessionFactory().openSession();
-            Transaction  tr= session.beginTransaction();
-            session.save(user);
-            tr.commit();
-            session.close();
-            return  "user Created Succesfull";
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-        return null;
-    }
-
-    public Location findLocationByCode(String locationCode) {
-        Session session = sessionFactory.openSession();
-        Location location = null;
-
-        try {
-            location = session.createQuery("FROM Location WHERE locationCode = :code", Location.class)
-                    .setParameter("code", locationCode)
-                    .uniqueResult();
-        } catch (Exception e) {
-            System.out.println("Error finding location by code: " + e.getMessage());
-        } finally {
-            session.close();
-        }
-
-        return location;
-    }
-
-    // this methood is not giving the data
-    // I need to implement it
-    public String getLocationByPersonId(String personId) {
-        String locationName = null; // Initialize the location name to null
+    public String borrowBook(UUID bookId, UUID userId, LocalDate pickupDate) {
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
             Transaction transaction = session.beginTransaction();
-            try {
-                // Create a query to fetch the location name based on the personId
-                String hql = "SELECT u.location.locationName FROM User u WHERE u.personId = :personId";
-                locationName = session.createQuery(hql, String.class)
-                        .setParameter("personId", personId)
-                        .uniqueResult();
-                transaction.commit(); // Commit the transaction
-            } catch (Exception e) {
-                if (transaction.isActive()) {
-                    transaction.rollback(); // Rollback in case of an error
-                }
-                e.printStackTrace(); // Handle exceptions appropriately
+
+            // Fetch Book entity and check if it exists and is available
+            Book book = session.get(Book.class, bookId);
+            if (book == null) {
+                return "Book not found";
             }
-        } catch (Exception ex) {
-            ex.printStackTrace(); // Handle exceptions for session opening
-        }
-        return locationName; // Return the location name or null if not found
-    }
-
-    public User authenticateUser(String username, String password) {
-        User user = null;
-
-        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            Transaction transaction = session.beginTransaction();
-
-            // HQL to fetch the user by username
-            String hql = "FROM User u WHERE u.userName = :username";
-            user = session.createQuery(hql, User.class)
-                    .setParameter("username", username)
-                    .uniqueResult();
-
-            transaction.commit(); // Commit the transaction
-
-            // Check if the user was found and validate the password
-            if (user != null && BCrypt.checkpw(password, user.getPassword())) {
-                return user; // Return the authenticated user
-            } else {
-                return null; // Return null if authentication fails
+            if (book.getStatus() ==EBook_status.BORROWED){
+                return  "Book Has been Borrowed";
             }
-        } catch (Exception ex) {
-            ex.printStackTrace(); // Handle exceptions appropriately
-            return null; // Return null in case of an error
-        }
-    }
+            if(book.getStatus() == EBook_status.RESERVED){
+                return  "The Book has been reserved";
+            }
+            // Fetch User (Reader) entity and check he  is in the database
+            User reader = session.get(User.class, userId);
+            if (reader == null) {
+                return "Reader not found";
+            }
+            // Verify if the user is allowed to borrow more books
+            if (!canUserBorrowMoreBooks(userId)) {
+                return "User cannot borrow more books than allowed by their membership";
+            }
 
-    public User personId(UUID person_id) {
-        User user = null;
+            // Calculate the due date (2 weeks)
+            LocalDate dueDate = pickupDate.plusWeeks(2);
+            // Create the BorrowerId with all necessary fields
+            BorrowerId borrowerId = new BorrowerId(bookId, userId, pickupDate, dueDate);
 
-        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            // Begin a transaction
-            Transaction transaction = session.beginTransaction();
-
-            // Fetch the user using the provided ID
-            user = session.get(User.class, person_id);
-
-            // Commit the transaction
+            // Create the Borrower entity with the initialized BorrowerId
+            Borrower borrower = new Borrower(borrowerId, book, reader, dueDate, 0);  // Fine initialized to 0
+            // Update the book's status to "BORROWED"
+            book.setStatus(EBook_status.BORROWED);
+            // Update book status
+            session.update(book);
+            // Persist the Borrower entity
+            session.persist(borrower);
             transaction.commit();
-        } catch (Exception ex) {
-            ex.printStackTrace(); // Handle exceptions appropriately
-        }
 
-        return user; // Return the found user or null if not found
+            return "Borrowing process successful";
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Borrowing process failed: " + e.getMessage();
+        }
     }
 
 
+    // Method to check if the user can borrow more books based on their membership type
     public boolean canUserBorrowMoreBooks(UUID userId) {
-        // Define the maximum number of books a user can borrow
-        int maxBooksAllowed = 5; // Adjust this according to your business rules
-
-        // Initialize the number of books borrowed by the user
-        int borrowedCount = 0;
-
-        Transaction transaction = null;
-
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
-            // Start a transaction
-            transaction = session.beginTransaction();
-
-            // Query to count the number of books borrowed by the user
-            Query query = (Query) session.createQuery("SELECT COUNT(b) FROM Borrower b WHERE b.reader.id = :userId", Long.class);
-            query.setParameter("userId", userId);
-            borrowedCount = query.getMaxResults(); // Get the count of borrowed books
-
-            // Commit the transaction
-            transaction.commit();
-        } catch (Exception e) {
-            if (transaction != null) {
-                transaction.rollback(); // Rollback if there was an error
+            // Fetch the User entity
+            User user = session.get(User.class, userId);
+            if (user == null) {
+                throw new IllegalArgumentException("User not found");
             }
-            e.printStackTrace(); // Handle the exception (logging, etc.)
-        }
 
-        // Check if the user can borrow more books
-        return borrowedCount < maxBooksAllowed;
+            // Fetch the Membership_type directly from the user's memberships
+            Membership_type membershipType = user.getMembershipList().stream()
+                    .flatMap(m -> m.getMembershipTypes().stream()) // Flatten to get all membership types
+                    .filter(mt -> mt.getMembership().getStatus() == EStatus.APPROVED) // Only approved statuses
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("No approved membership type found for user"));
+
+            // Get the maxBooks value from the Membership_type entity
+            int borrowingLimit = membershipType.getMaxBooks();
+
+            // Count how many books the user has already borrowed
+            long borrowedBooksCount = session.createQuery(
+                            "SELECT COUNT(b) FROM Borrower b WHERE b.reader.userId = :userId", Long.class)
+                    .setParameter("userId", userId)
+                    .getSingleResult();
+
+            // Check if the user has reached the borrowing limit
+            return borrowedBooksCount < borrowingLimit;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;  // Default to false if an error occurs
+        }
     }
+
 
 }
